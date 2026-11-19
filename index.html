@@ -463,7 +463,7 @@ async function liveBoot(){
   try{[ro,as,rq,dr,lg]=await Promise.all([0,1,2,3,4].map(qAll))}catch(e){msg.textContent="Couldn't reach the ArcGIS tables: "+e.message;btn.style.display="";btn.textContent="Try again";btn.onclick=()=>location.reload();return}
   const RK={"Captain":"Capt.","Lieutenant":"Lt."};
   const roster=ro.map(a=>{const q=new Set();splitL(a.Quals).forEach(x=>QM[x]&&q.add(QM[x]));const c=a.Cert||"";if(c==="CCT")q.add("CCT");if(c==="CCT"||c==="EMT-P"){q.add("ALS");q.add("BLS")}if(c==="EMT")q.add("BLS");
-    return {id:"r"+a.OBJECTID,spId:a.OBJECTID,n:a.Name||"",rk:RK[a.Rank]||"",cert:a.RosterCert||c,q:[...q],formIn:!!a.FormIn,tech:splitL(a.Quals).filter(x=>!QM[x]),cur:a.CurShift?{s:a.CurShift,st:a.CurStation,u:a.CurUnit}:null}});
+    return {id:"r"+a.OBJECTID,spId:a.OBJECTID,n:(a.Name||"").replace(/^(Capt\.|Lt\.)\s*/,""),rk:RK[a.Rank]||"",cert:a.RosterCert||c,q:[...q],formIn:!!a.FormIn,tech:splitL(a.Quals).filter(x=>!QM[x]),cur:a.CurShift?{s:a.CurShift,st:a.CurStation,u:a.CurUnit}:null}});
   const pid=Object.fromEntries(roster.map(r=>[String(r.spId),r.id]));
   const A={},AI={},pins=[];as.forEach(a=>{const p=pid[String(a.PersonId)];if(!p)return;A[a.SeatKey]=p;AI[a.SeatKey]=a.OBJECTID;if(a.Pinned)pins.push(p)});
   const resp=rq.map(a=>mapResp(a,pid)).filter(Boolean);
