@@ -757,8 +757,11 @@ function seatCost(p,s,u,lab,req){if(!meets(p,req))return 1e6;
   const sr=p.sp.indexOf(s),tr=p.tp.indexOf(u.s);let c=[0,6,12][sr]??14;c+=tr<0?8:tr*1.5;
   if(p.up&&!/^no/i.test(p.up)&&!UT[u.t].test(p.up))c+=1.5;
   if(!req.includes("ALS")&&has(p,"ALS"))c+=3;if(p.rk&&!OFFSEAT.includes(lab))c+=6;if(p.rk==="Capt."&&lab!=="Captain")c+=6;if(u.t!=="sup"&&has(p,"SUP"))c+=3;if(lab==="FF"&&has(p,"DPO"))c+=.5;
+  /* Officer seats: a Lieutenant/Captain before an OIC-cleared firefighter. */
+  if(OFFSEAT.includes(lab)&&!p.rk)c+=4;
   if(p.cur&&p.cur.s===s&&p.cur.st===u.s)c-=2;
-  const crit=[...OFFSEAT,"DPO","ALS"].includes(lab)?8:0;return c-20-crit}
+  /* A unit can't run without its officer, DPO or ALS provider, so those seats outrank any preference cost. */
+  const crit=OFFSEAT.includes(lab)?30:["DPO","ALS"].includes(lab)?20:0;return c-20-crit}
 const UPRI={med:4,eng:3,sup:2,amb:1};
 function solve(keep,targets){const seats=[];SH.forEach(s=>UNITS.forEach(u=>SEATS_(u).forEach(([lab,req],i)=>{const k=key(s,u.id,i);if(!keep[k])seats.push({k,s,u,lab,req,t:targets.has(s+"|"+u.id)})})));
   const pinned=new Set(Object.values(keep)),ppl=P.filter(p=>!pinned.has(p.id));
