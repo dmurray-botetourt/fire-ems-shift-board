@@ -473,9 +473,9 @@ async function liveBoot(){
   gate.style.display="flex";msg.textContent="Loading the board…";
   let ro,as,rq,dr,lg;
   try{[ro,as,rq,dr,lg]=(await Promise.all([0,1,2,3,4].map(qAll))).map(t=>t.map(cleanRow))}catch(e){msg.textContent="Couldn't reach the ArcGIS tables: "+e.message;btn.style.display="";btn.textContent="Try again";btn.onclick=()=>location.reload();return}
-  const RK={"Captain":"Capt.","Lieutenant":"Lt."};
+  const RK={"Captain":"Capt.","Lieutenant":"Lt.","Master Firefighter":"MFF"};
   const roster=ro.map(a=>{const q=new Set(["FF"]);splitL(a.Quals).forEach(x=>QM[x]&&q.add(QM[x]));const c=a.Cert||"";if(c==="CCT")q.add("CCT");if(c==="CCT"||c==="EMT-P"){q.add("ALS");q.add("BLS")}if(c==="EMT")q.add("BLS");
-    return {id:"r"+a.OBJECTID,spId:a.OBJECTID,n:(a.Name||"").replace(/^(Capt\.|Lt\.)\s*/,""),rk:RK[a.Rank]||"",cert:a.FormIn?(c||a.RosterCert):(a.RosterCert||c),q:[...q],formIn:!!a.FormIn,tech:splitL(a.Quals).filter(x=>!QM[x]),cur:a.CurShift?{s:a.CurShift,st:String(a.CurStation||""),u:SEATN[a.CurUnit]?a.CurUnit:null}:null}});
+    return {id:"r"+a.OBJECTID,spId:a.OBJECTID,n:(a.Name||"").replace(/^(Capt\.|Lt\.|MFF)\s*/,""),rk:RK[a.Rank]||"",cert:a.FormIn?(c||a.RosterCert):(a.RosterCert||c),q:[...q],formIn:!!a.FormIn,tech:splitL(a.Quals).filter(x=>!QM[x]),cur:a.CurShift?{s:a.CurShift,st:String(a.CurStation||""),u:SEATN[a.CurUnit]?a.CurUnit:null}:null}});
   const pid=Object.fromEntries(roster.map(r=>[String(r.spId),r.id]));
   /* Load seats. Rows for unknown seats, unknown people, a second row for the same seat, or the same person in two seats
      are dropped from the board and deleted from the table so the data stays clean. */
@@ -514,8 +514,8 @@ async function liveBoot(){
   /* Is this request still in the table? (It may have been deleted since this page loaded.) */
   LV.reqExists=async rid=>{try{const j=await agol(`/${T.Requests}/query`,{where:`OBJECTID=${+rid}`,returnCountOnly:true});return j.count>0}catch(e){return true}};
   LV.onSkip=r=>enq(()=>edits(T.Requests,{updates:[{OBJECTID:r.rid,Status:"Ignored"}]}));
-  LV.onApply=(p,r)=>{const RN={"Capt.":"Captain","Lt.":"Lieutenant"};
-    const at={Name:p.n,LastName:p.last,FirstInit:(p.n.replace(/^(Capt\.|Lt\.)\s*/,"")[0]||""),Email:r.em||null,Rank:RN[p.rk]||"Firefighter / Provider",Cert:r.cert,Quals:r.q.join(", "),FormIn:1};
+  LV.onApply=(p,r)=>{const RN={"Capt.":"Captain","Lt.":"Lieutenant","MFF":"Master Firefighter"};
+    const at={Name:p.n,LastName:p.last,FirstInit:(p.n.replace(/^(Capt\.|Lt\.|MFF)\s*/,"")[0]||""),Email:r.em||null,Rank:RN[p.rk]||"Firefighter / Provider",Cert:r.cert,Quals:r.q.join(", "),FormIn:1};
     const done=s=>s==="Matched"||s==="New person";
     const markReq=()=>done(r.status)&&r.matchedTo===p.spId?0:edits(T.Requests,{updates:[{OBJECTID:r.rid,Status:p.isNew?"New person":"Matched",MatchedTo:p.spId}]}).then(()=>{r.status="Matched";r.matchedTo=p.spId});
     if(!p.spId){p.isNew=true;enq(()=>edits(T.Roster,{adds:[{...at,Source:"Added from form"}]}).then(j=>{p.spId=j.addResults[0].objectId}).then(markReq))}
@@ -559,7 +559,7 @@ function mapResp(a,pid){if(a.Status==="Ignored")return null;
 function BOOT(){
 const SH=["A","B","C"];
 const STN=[["1",[["M1","Medic 1","med"]]],["2",[["M2","Medic 2","med"]]],["3",[["E3","Engine 3","eng"],["M3","Medic 3","med"]]],
-  ["4",[["A4","Ambo 4","amb"],["C11","County 11","sup"]]],["5",[["M5","Medic 5","med"]]],["7",[["E7","Engine 7","eng"],["A7","Ambo 7","amb"],["C12","County 12","sup"]]]];
+  ["4",[["A4","Ambo 4","amb"],["C12","County 12","sup"]]],["5",[["M5","Medic 5","med"]]],["7",[["E7","Engine 7","eng"],["A7","Ambo 7","amb"],["C11","County 11","sup"]]]];
 /* Seats and what fills them. "A+B" = needs both. Engines: Lieutenant (or OIC) + DPO + 2 FF. County 11: Captain with CCT. County 12: Lieutenant with CCT. */
 const SEATS={C11:[["Captain",["CAPT+CCT"]]],C12:[["Lieutenant",["LT+CCT"]]],eng:[["Officer",["LT","OFF"]],["DPO",["DPO"]],["FF",["FF"]],["FF",["FF"]]],med:[["ALS",["ALS"]],["BLS",["BLS","ALS"]]],amb:[["BLS",["BLS","ALS"]],["BLS",["BLS","ALS"]]],sup:[["EMS Sup",["SUP"]]]};
 const SEATS_=u=>SEATS[u.id]||SEATS[u.t];
@@ -583,12 +583,14 @@ const byId=Object.fromEntries(P.map(p=>[p.id,p]));
 /* Last-name key used on both sides: drop rank, suffixes (Jr, Sr, II…), apostrophes and spaces so O'Brien = OBrien and "Van Dyke" = "VanDyke". */
 const SUFX=/\s+(jr|sr|ii|iii|iv|v)\.?$/i;
 const lkey=s=>String(s||"").toLowerCase().replace(/[^a-z]/g,"");
-const bare=n=>String(n||"").replace(/^(Capt\.|Lt\.)\s*/,"").replace(SUFX,"").trim();
+const bare=n=>String(n||"").replace(/^(Capt\.|Lt\.|MFF)\s*/,"").replace(SUFX,"").trim();
 /* Roster names look like "B. Golla", "Jones" or (after a form) "Jason Van Dyke": the last name is whatever follows the first name/initial. */
 const lastOf=n=>{const t=bare(n).split(/\s+/);return lkey(t.length>1?t.slice(1).join(""):t[0])};
 const lm=(n,last)=>{const t=bare(n).split(/\s+/);return lastOf(n)===last||lkey(t[t.length-1])===last};
-const fiOf=n=>{const t=String(n||"").replace(/^(Capt\.|Lt\.)\s*/,"").trim();return /^[A-Za-z][.\s]/.test(t)||t.split(/\s+/).length>1?t[0].toUpperCase():""};
-const RCODE={"Captain":"Capt.","Lieutenant":"Lt."};
+const fiOf=n=>{const t=String(n||"").replace(/^(Capt\.|Lt\.|MFF)\s*/,"").trim();return /^[A-Za-z][.\s]/.test(t)||t.split(/\s+/).length>1?t[0].toUpperCase():""};
+const RCODE={"Captain":"Capt.","Lieutenant":"Lt.","Master Firefighter":"MFF"};
+/* Master Firefighter is a title only: officer seats still go by rank (Capt./Lt.) or the OIC qual. */
+const isOff=p=>p.rk==="Capt."||p.rk==="Lt.";
 const FQ={"CCT":"CCT","ALS":"ALS","BLS":"BLS","FF":"FF","DPO":"DPO","Cleared Engine Officer":"OFF","Cleared EMS Supervisor":"SUP"};
 const TECH=["Swiftwater Tech","Surface Water Tech","Swiftwater","SAR","Rope Ops","Trench Ops","Confined Space Ops","Vehicle Extrication Ops"];
 function parseResp(r){const [l,f]=r.name.split(",").map(x=>x.trim());return {last:lkey(l.replace(SUFX,"")),fi:(f||"")[0]?f[0].toUpperCase():"",disp:(f?f+" ":"")+l}}
@@ -761,9 +763,9 @@ const OFFSEAT=["Officer","Lieutenant","Captain"];
 function seatCost(p,s,u,lab,req){if(!meets(p,req))return 1e6;
   const sr=p.sp.indexOf(s),tr=p.tp.indexOf(u.s);let c=[0,6,12][sr]??14;c+=tr<0?8:tr*1.5;
   if(p.up&&!/^no/i.test(p.up)&&!UT[u.t].test(p.up))c+=1.5;
-  if(!req.includes("ALS")&&has(p,"ALS"))c+=3;if(p.rk&&!OFFSEAT.includes(lab))c+=6;if(p.rk==="Capt."&&lab!=="Captain")c+=6;if(u.t!=="sup"&&has(p,"SUP"))c+=3;if(lab==="FF"&&has(p,"DPO"))c+=.5;
+  if(!req.includes("ALS")&&has(p,"ALS"))c+=3;if(isOff(p)&&!OFFSEAT.includes(lab))c+=6;if(p.rk==="Capt."&&lab!=="Captain")c+=6;if(u.t!=="sup"&&has(p,"SUP"))c+=3;if(lab==="FF"&&has(p,"DPO"))c+=.5;
   /* Officer seats: a Lieutenant/Captain before an OIC-cleared firefighter. */
-  if(OFFSEAT.includes(lab)&&!p.rk)c+=4;
+  if(OFFSEAT.includes(lab)&&!isOff(p))c+=4;
   if(p.cur&&p.cur.s===s&&p.cur.st===u.s)c-=2;
   /* A unit can't run without its officer, DPO or ALS provider, so those seats outrank any preference cost. */
   const crit=OFFSEAT.includes(lab)?30:["DPO","ALS"].includes(lab)?20:0;return c-20-crit}
@@ -889,7 +891,7 @@ function sendHome(pid){const p=byId[pid],h=homeSeat(p);if(!h||!h.k){toast(h&&h.f
   place(pid,h.k);const d=desc(h.k);toast(`${p.n} sent home → ${d.s} · ${d.un.n} ${d.lab}`,true)}
 function sendAllHome(){const list=P.filter(p=>!where(p.id)&&p.cur);if(!list.length){toast("Nobody unassigned has a home spot on file.");return}
   hist.push(JSON.stringify(A));let ok=0;const miss=[];
-  list.sort((a,b)=>(b.rk?1:0)-(a.rk?1:0)||a.last.localeCompare(b.last)).forEach(p=>{const h=homeSeat(p);if(h&&h.k){A[h.k]=p.id;ok++}else miss.push(p.n)});
+  list.sort((a,b)=>(isOff(b)?1:0)-(isOff(a)?1:0)||a.last.localeCompare(b.last)).forEach(p=>{const h=homeSeat(p);if(h&&h.k){A[h.k]=p.id;ok++}else miss.push(p.n)});
   LOG.push({t:now(),m:`You sent ${ok} people back home`});render();saving();
   toast(ok?`Sent ${ok} back home${miss.length?` · ${miss.length} couldn't go (home spot full): ${miss.slice(0,3).join(", ")}${miss.length>3?"…":""}`:""}`:"No open home spots for anyone unassigned.",!!ok)}
 function hl(pid){const p=byId[pid];document.querySelectorAll(".seat:not(.f)").forEach(el=>el.classList.toggle("can",meets(p,desc(el.dataset.k).req)))}
@@ -897,7 +899,7 @@ function openDrawer(html){$("#drawer").innerHTML=`<button class="close" aria-lab
 function closeDrawer(){ui.dr=null;document.body.classList.remove("dopen")}
 function showReq(id){ui.dr=id;const p=byId[id],k=where(id),d=k&&desc(k);
   const chain=(arr,hit,f)=>`<div class="chain">${arr.map((x,i)=>`<span class="${x===hit?"hit":""}">${i+1}. ${f(x)}</span>`).join("")}</div>`;
-  openDrawer(`<div class="dh">${hx(p)}<div><b>${p.n}</b><span>${[p.rk?({"Capt.":"Captain","Lt.":"Lieutenant"})[p.rk]:"",p.cert,p.em].filter(Boolean).join(" · ")}</span></div></div>
+  openDrawer(`<div class="dh">${hx(p)}<div><b>${p.n}</b><span>${[p.rk?({"Capt.":"Captain","Lt.":"Lieutenant","MFF":"Master Firefighter"})[p.rk]:"",p.cert,p.em].filter(Boolean).join(" · ")}</span></div></div>
   <div class="ds"><h4>Assignment now</h4><p class="now dim">${p.cur?`${p.cur.s} Shift · Station ${p.cur.st}${p.cur.u?" · "+uName(p.cur.u):""}`:"None on file"}</p></div>
   <div class="ds"><h4>New assignment</h4><p class="now ${k?"ok":"warn"}">${k?`${staying(p,k)?stayI:""}${d.s} Shift · ${d.un.n} · ${d.lab}${staying(p,k)?' <small class="dim" style="font:500 13px var(--sans)">staying in place</small>':""}`:"Not placed"}</p></div>
   <div class="ds"><h4>What they asked for</h4><dl class="prefs">
@@ -971,7 +973,7 @@ $("#find").addEventListener("keydown",e=>{if(e.key==="Enter"){const f=$("#fres b
 document.addEventListener("click",e=>{if(!e.target.closest(".find"))$("#fres").classList.remove("on")},true);
 window.__sb={get A(){return A},ui,PIN};
 $("#drN").textContent=DRAFTS.length;
-window.APP={get A(){return A},set A(v){A=v},PIN,P,byId,RESP,render,fmCount,autoMatch,toast};
+window.APP={get A(){return A},set A(v){A=v},PIN,P,byId,RESP,render,fmCount,autoMatch,toast,has,meets,STN};
 if(window.LIVE){const _p=LOG.push.bind(LOG);LOG.push=x=>{const r=_p(x);LV.onLog(x);return r}}
 render();
 }
