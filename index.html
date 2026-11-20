@@ -511,6 +511,8 @@ async function liveBoot(){
   LV.onLog=x=>enq(()=>edits(T.Log,{adds:[{Msg:x.m,Created:Date.now()}]}));
   LV.onDraft=d=>enq(()=>edits(T.Drafts,{adds:[{Name:d.name,Snapshot:d.A,Created:Date.now()}]}).then(j=>{d.spId=j.addResults[0].objectId}));
   LV.onDraftDel=d=>d.spId&&enq(()=>edits(T.Drafts,{deletes:[d.spId]}));
+  /* Is this request still in the table? (It may have been deleted since this page loaded.) */
+  LV.reqExists=async rid=>{try{const j=await agol(`/${T.Requests}/query`,{where:`OBJECTID=${+rid}`,returnCountOnly:true});return j.count>0}catch(e){return true}};
   LV.onSkip=r=>enq(()=>edits(T.Requests,{updates:[{OBJECTID:r.rid,Status:"Ignored"}]}));
   LV.onApply=(p,r)=>{const RN={"Capt.":"Captain","Lt.":"Lieutenant"};
     const at={Name:p.n,LastName:p.last,FirstInit:(p.n.replace(/^(Capt\.|Lt\.)\s*/,"")[0]||""),Email:r.em||null,Rank:RN[p.rk]||"Firefighter / Provider",Cert:r.cert,Quals:r.q.join(", "),FormIn:1};
@@ -530,6 +532,9 @@ async function liveBoot(){
       const remoteDiff=ent(A2)!==ent(synced.A)||JSON.stringify(P2.slice().sort())!==JSON.stringify(synced.pins);
       if(unknown){if(!warnedNew){warnedNew=true;APP.toast("Another assigner added someone new. Reload the page to see them.")}}
       else if(localClean&&remoteDiff){busy=true;for(const k in AI)delete AI[k];Object.assign(AI,AI2);APP.A=A2;APP.PIN.clear();P2.forEach(x=>APP.PIN.add(x));synced={A:{...A2},pins:P2.slice().sort()};busy=false;APP.render();APP.toast("Board updated by another assigner")}
+      const onServer=new Set(rq2.map(a=>String(a.OBJECTID)));let gone=0;
+      for(let i=APP.RESP.length-1;i>=0;i--){const r=APP.RESP[i];if(!onServer.has(String(r.rid))&&!r.pid){APP.RESP.splice(i,1);gone++}}
+      if(gone){APP.fmCount();APP.render()}
       const known=new Set(APP.RESP.map(r=>String(r.rid)));const fresh=rq2.map(a=>mapResp(a,byS)).filter(r=>r&&!known.has(String(r.rid)));
       if(fresh.length){fresh.forEach(r=>{APP.RESP.push(r);APP.autoMatch(r)});APP.fmCount();APP.render();APP.toast(`${fresh.length} new request${fresh.length>1?"s":""}`)}}catch(e){console.warn(e)}},20000);
   setInterval(()=>window.APP&&LV.tick(),1200);
@@ -807,8 +812,14 @@ function showForms(){ui.dr="__forms";const um=unmatched(),got=RESP.filter(r=>r.p
   <div class="ds"><h4>No form yet (${none.length})</h4><p class="ok1">${none.sort((a,b)=>a.last.localeCompare(b.last)).map(p=>`<span>${p.n}</span>`).join(", ")||"Everyone has turned one in."}</p></div>
   <div class="ds"><h4>Matched (${got.length})</h4><p class="ok1">${got.map(r=>`<b>${byId[r.pid].n}</b> <span class="dim">← ${r.name}</span>`).join("<br>")}</p></div>`);
   document.querySelectorAll("[data-fsel]").forEach(el=>el.addEventListener("change",()=>{if(el.value)fmMatch(el.dataset.fsel,el.value)}))}
-function fmMatch(rid,pid){const r=RESP.find(x=>x.rid==rid),p=byId[pid];applyResp(p,r);LOG.push({t:now(),m:`Matched form "${r.name}" to ${p.n}`});toast(`${p.n}: form applied`);fmCount();render();showForms()}
-function fmNew(rid){const r=RESP.find(x=>x.rid==rid),p={id:"n"+r.rid,n:"",q:[],cur:null,nr:true,sp:[],tp:[],up:"",note:"",at:"",em:""};P.push(p);byId[p.id]=p;applyResp(p,r);LOG.push({t:now(),m:`Added ${p.n} from the form (not on the roster)`});toast(`${p.n} added to Unassigned`);fmCount();render();showForms()}
+async function stillThere(r){if(!window.LIVE||!LV.reqExists)return true;const ok=await LV.reqExists(r.rid);
+  if(!ok){const i=RESP.indexOf(r);if(i>=0)RESP.splice(i,1);toast("That form was deleted, so it wasn't applied.");fmCount();render();showForms()}return ok}
+async function fmMatch(rid,pid){const r=RESP.find(x=>x.rid==rid),p=byId[pid];if(!r||!p)return;
+  /* A different last name means this form will replace someone else's name, rank and quals. Make that a deliberate choice. */
+  if(!lm(p.n,parseResp(r).last)&&!confirm(`Apply the form from ${r.name} to ${p.n}?\n\nThis replaces ${p.n}'s name, rank and qualifications on the roster with what's on this form.`))return;
+  if(!(await stillThere(r)))return;
+  applyResp(p,r);LOG.push({t:now(),m:`Matched form "${r.name}" to ${p.n}`});toast(`${p.n}: form applied`);fmCount();render();showForms()}
+async function fmNew(rid){const r0=RESP.find(x=>x.rid==rid);if(!r0||!(await stillThere(r0)))return;const r=r0,p={id:"n"+r.rid,n:"",q:[],cur:null,nr:true,sp:[],tp:[],up:"",note:"",at:"",em:""};P.push(p);byId[p.id]=p;applyResp(p,r);LOG.push({t:now(),m:`Added ${p.n} from the form (not on the roster)`});toast(`${p.n} added to Unassigned`);fmCount();render();showForms()}
 function showDrafts(){ui.dr="__drafts";
   openDrawer(`<div class="dh"><div><b>Drafts</b><span>Save versions of the board and bring any of them back.</span></div></div>
   <div class="ds"><h4>Save the board as it is now</h4><form class="dsave" id="dsave"><input id="dname" placeholder="Draft ${DRAFTS.length+1}" aria-label="Draft name"><button class="btn primary" type="submit">Save draft</button></form></div>
