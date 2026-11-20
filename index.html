@@ -673,10 +673,10 @@ const sc=score();
   $("#main").className="main"+(["req","roster","chg"].includes(ui.v)?" wide":"");
   $("#filt").innerHTML=QF.map(q=>`<button class="${ui.f.has(q)?"on":""}" data-f="${q}">${QN[q]}</button>`).join("");
   let list=P.filter(p=>!where(p.id)&&(!ui.q||p.n.toLowerCase().includes(ui.q))&&[...ui.f].every(q=>has(p,q)));
-  const gk=p=>B?p.sp.indexOf(ui.s):SH.indexOf(p.sp[0]);
+  const gk=p=>p.nr&&!p.cur?9:B?p.sp.indexOf(ui.s):SH.indexOf(p.sp[0]);
   list.sort((a,b)=>gk(a)-gk(b)||a.last.localeCompare(b.last));
   $("#trayN").textContent=list.length;
-  let last=-1;$("#list").innerHTML=list.map(p=>{const g=gk(p),h=g!==last?`<div class="grp">${p.nr?`On ${SH[SH.indexOf(p.cur.s)]} shift now · no form yet`:B?`${ord(g+1)} choice for ${ui.s} shift`:`Wants ${SH[g]} shift first`}</div>`:"";last=g;return h+tag(p,1)}).join("")||`<div class="empty">Everyone is placed.</div>`;
+  let last=-1;$("#list").innerHTML=list.map(p=>{const g=gk(p),h=g!==last?`<div class="grp">${p.nr?(p.cur?`On ${p.cur.s} shift now · no form yet`:"New / recruits · no form yet"):B?`${ord(g+1)} choice for ${ui.s} shift`:`Wants ${SH[g]} shift first`}</div>`:"";last=g;return h+tag(p,1)}).join("")||`<div class="empty">Everyone is placed.</div>`;
   $("#view").innerHTML=B?vBoard():ui.v==="all"?vAll():ui.v==="req"?vReq():ui.v==="chg"?vChg():vRoster();
   if(ui.dr==="__auto")showAuto();
   const iss=issues().filter(x=>x.lvl<2).length;$("#issN").textContent=iss;$("#issN").className="n"+(iss?"":" z");
@@ -839,7 +839,7 @@ function showReq(id){ui.dr=id;const p=byId[id],k=where(id),d=k&&desc(k);
     ${p.note?`<dt>Comment</dt><dd>${p.note}</dd>`:""}
     ${p.nr?"":`<dt>Submitted</dt><dd class="dim">${p.at}</dd>`}</dl></div>
   <div class="ds"><h4>Move to an open seat they qualify for</h4><div class="qm">${SH.map(s=>{const o=[];UNITS.forEach(u=>SEATS_(u).forEach(([lab,req],i)=>{const kk=key(s,u.id,i);if(!A[kk]&&meets(p,req)&&!o.some(x=>x.u===u.id&&x.lab===lab))o.push({u:u.id,lab,kk,star:p.tp[0]===u.s});}));
-    const r=p.sp.indexOf(s)+1;return `<div class="qc" style="--c:var(--${s})"><h5><i></i>${s}<small>${p.nr?(s===p.cur.s?"current":""):ord(r)+" choice"}</small></h5>${o.map(x=>`<button data-mv="${x.kk}">${x.u} · ${x.lab}${x.star&&!p.nr?" ★":""}</button>`).join("")||'<p class="none">No open seats</p>'}</div>`}).join("")}</div>
+    const r=p.sp.indexOf(s)+1;return `<div class="qc" style="--c:var(--${s})"><h5><i></i>${s}<small>${p.nr?(p.cur&&s===p.cur.s?"current":""):ord(r)+" choice"}</small></h5>${o.map(x=>`<button data-mv="${x.kk}">${x.u} · ${x.lab}${x.star&&!p.nr?" ★":""}</button>`).join("")||'<p class="none">No open seats</p>'}</div>`}).join("")}</div>
     ${!k&&p.cur?(()=>{const h=homeSeat(p);return h&&h.k?`<button class="home1" data-home="${id}"><svg><use href="#i-home"/></svg>Send back home · ${desc(h.k).s} · ${desc(h.k).un.n} ${desc(h.k).lab}</button>`:`<p class="warn" style="font-size:13px;margin-top:8px">Home spot (${homeLbl(p)}) is full.</p>`})():""}
     ${k?`<button class="rt" data-pin="${id}">${PIN.has(id)?"Unpin":"Pin in place"}</button>${PIN.has(id)?"":`<button class="rt" data-rt="${id}">Move back to unassigned</button>`}`:""}${p.nr?"":`<p class="dim" style="font-size:12px;margin-top:8px">★ their 1st-choice station</p>`}</div>`)}
 function showIssues(){ui.dr="__iss";const all=issues();
