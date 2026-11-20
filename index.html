@@ -543,7 +543,7 @@ function mapResp(a,pid){if(a.Status==="Ignored")return null;
   splitR(a.ShiftRank).forEach(x=>{x=x.replace(/_/g," ").trim();const m=x.match(/^([ABC])\b/i)||x.match(/\b([ABC])\s*shift/i)||x.match(/shift\s*([ABC])\b/i);const v=m&&m[1].toUpperCase();if(v&&!sp.includes(v))sp.push(v)});
   splitR(a.StationRank).forEach(x=>{const m=String(x).match(/\d+/);const v=m&&String(+m[0]);if(v&&!tp.includes(v))tp.push(v)});
   ["A","B","C"].forEach(x=>sp.includes(x)||sp.push(x));["1","2","3","4","5","7"].forEach(x=>tp.includes(x)||tp.push(x));
-  const r={rid:a.OBJECTID,name:`${last}, ${first}`,em:a.Email||"",rank:a.Rank||"",cert:a.Cert||"",q:splitR(a.Quals).map(normQ),sp,tp,up:a.UnitPref||"",stay:a.StayPref||"",note:a.Notes||"",
+  const r={rid:a.OBJECTID,name:`${last}, ${first}`,em:a.Email||"",rank:(a.Rank||"").replace(/\s*\(no officer rank\)/i,""),cert:a.Cert||"",q:splitR(a.Quals).map(normQ),sp,tp,up:a.UnitPref||"",stay:a.StayPref||"",note:a.Notes||"",
     at:a.Submitted?new Date(a.Submitted).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"",status:a.Status,matchedTo:a.MatchedTo||null};
   if(!r.cert)r.cert=r.q.includes("CCT")?"CCT":r.q.includes("ALS")?"EMT-P":r.q.includes("BLS")?"EMT":"";
   if((a.Status==="Matched"||a.Status==="New person")&&a.MatchedTo)r.pre=pid[String(a.MatchedTo)];
@@ -797,7 +797,7 @@ function fmCount(){const n=unmatched().length,e=$("#fmN");e.textContent=n;e.clas
 function showForms(){ui.dr="__forms";const um=unmatched(),got=RESP.filter(r=>r.pid),none=P.filter(p=>p.nr);
   openDrawer(`<div class="dh"><div><b>Forms</b><span>${got.length} matched · ${um.length} need a match · ${none.length} people with no form yet</span></div></div>
   <div class="ds"><h4>Need a match (${um.length})</h4><div class="fm">${um.map(r=>{const c=candidates(r);
-    return `<div class="fr"><div class="ft"><b>${r.name}</b><span>${r.at}</span></div><div class="fw">${[r.rank,r.cert].filter(Boolean).join(" · ")} · ${r.em}<br><em>${c.some(p=>lm(p.n,parseResp(r).last))?"More than one person with this last name":"No one on the roster with this last name"}</em></div>
+    return `<div class="fr"><div class="ft"><b>${r.name}</b><span>${r.at}</span></div><div class="fw">${[r.rank,r.cert,r.em].filter(Boolean).join(" · ")}<br><em>${c.some(p=>lm(p.n,parseResp(r).last))?"More than one person with this last name":"No one on the roster with this last name"}</em></div>
       <div class="fc">${c.map(p=>`<button data-fm="${r.rid}" data-to="${p.id}" title="${curTxt(p)}">${p.n} <small class="dim">${p.cur?p.cur.s+"·"+p.cur.st:""}</small></button>`).join("")}
       <select data-fsel="${r.rid}" aria-label="Pick someone else"><option value="">Someone else…</option>${P.filter(p=>p.nr).sort((a,b)=>a.last.localeCompare(b.last)).map(p=>`<option value="${p.id}">${p.n}</option>`).join("")}</select>
       <button class="nw" data-fnew="${r.rid}">Add as new person</button><button class="nw" data-fskip="${r.rid}">Ignore</button></div></div>`}).join("")||'<p class="dim">Every form matched someone.</p>'}</div></div>
