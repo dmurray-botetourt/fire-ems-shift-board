@@ -558,8 +558,8 @@ function mapResp(a,pid){if(a.Status==="Ignored")return null;
 <script>
 function BOOT(){
 const SH=["A","B","C"];
-const STN=[["1",[["M1","Medic 1","med"]]],["2",[["M2","Medic 2","med"]]],["3",[["E3","Engine 3","eng"],["M3","Medic 3","med"]]],
-  ["4",[["A4","Ambo 4","amb"],["C12","County 12","sup"]]],["5",[["M5","Medic 5","med"]]],["7",[["E7","Engine 7","eng"],["A7","Ambo 7","amb"],["C11","County 11","sup"]]]];
+const STN=[["1",[["M1","Medic 1","med"],["C11","County 11","sup"]]],["2",[["M2","Medic 2","med"]]],["3",[["E3","Engine 3","eng"],["M3","Medic 3","med"]]],
+  ["4",[["A4","Ambo 4","amb"],["C12","County 12","sup"]]],["5",[["M5","Medic 5","med"]]],["7",[["E7","Engine 7","eng"],["A7","Ambo 7","amb"]]]];
 /* Seats and what fills them. "A+B" = needs both. Engines: Lieutenant (or OIC) + DPO + 2 FF. County 11: Captain with CCT. County 12: Lieutenant with CCT. */
 const SEATS={C11:[["Captain",["CAPT+CCT"]]],C12:[["Lieutenant",["LT+CCT"]]],eng:[["Officer",["LT","OFF"]],["DPO",["DPO"]],["FF",["FF"]],["FF",["FF"]]],med:[["ALS",["ALS"]],["BLS",["BLS","ALS"]]],amb:[["BLS",["BLS","ALS"]],["BLS",["BLS","ALS"]]],sup:[["EMS Sup",["SUP"]]]};
 const SEATS_=u=>SEATS[u.id]||SEATS[u.t];
