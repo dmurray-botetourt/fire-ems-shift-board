@@ -454,8 +454,8 @@ async function agol(path,params,post){const body=new URLSearchParams({f:"json",.
 async function qAll(t){let out=[],off=0;for(;;){const j=await agol(`/${t}/query`,{where:"1=1",outFields:"*",resultOffset:off,resultRecordCount:2000,orderByFields:"OBJECTID"});out=out.concat(j.features.map(f=>f.attributes));if(!j.exceededTransferLimit)return out;off+=j.features.length}}
 async function edits(t,{adds,updates,deletes}){const p={};if(adds)p.adds=JSON.stringify(adds.map(a=>({attributes:a})));if(updates)p.updates=JSON.stringify(updates.map(a=>({attributes:a})));if(deletes)p.deletes=deletes.join(",");
   const j=await agol(`/${t}/applyEdits`,p,true);const bad=[...(j.addResults||[]),...(j.updateResults||[]),...(j.deleteResults||[])].find(x=>!x.success);if(bad)throw new Error((bad.error&&bad.error.description)||"Save failed");return j}
-const QM={"ALS":"ALS","BLS":"BLS","FF":"FF","DPO":"DPO","Cleared Engine Officer":"OFF","Cleared EMS Supervisor":"SUP"};
-const QKEYS=["ALS","BLS","FF","DPO","Cleared Engine Officer","Cleared EMS Supervisor","Swiftwater","SAR","Rope Ops","Trench Ops","Confined Space Ops","Vehicle Extrication Ops"];
+const QM={"CCT":"CCT","ALS":"ALS","BLS":"BLS","FF":"FF","DPO":"DPO","Cleared Engine Officer":"OFF","Cleared EMS Supervisor":"SUP"};
+const QKEYS=["CCT","ALS","BLS","FF","DPO","Cleared Engine Officer","Cleared EMS Supervisor","Swiftwater Tech","Surface Water Tech","Swiftwater","SAR","Rope Ops","Trench Ops","Confined Space Ops","Vehicle Extrication Ops"];
 const QALIAS={firefighter:"FF",driveroperator:"DPO",driverpumpoperator:"DPO",engineofficer:"Cleared Engine Officer",emssupervisor:"Cleared EMS Supervisor",searchandrescue:"SAR",swiftwaterrescue:"Swiftwater",extrication:"Vehicle Extrication Ops",vehicleextrication:"Vehicle Extrication Ops"};
 const qk=x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,"");
 const normQ=x=>{const k=qk(x);return QKEYS.find(q=>qk(q)===k)||QALIAS[k]||String(x).replace(/_/g," ").trim()};
@@ -474,7 +474,7 @@ async function liveBoot(){
   let ro,as,rq,dr,lg;
   try{[ro,as,rq,dr,lg]=(await Promise.all([0,1,2,3,4].map(qAll))).map(t=>t.map(cleanRow))}catch(e){msg.textContent="Couldn't reach the ArcGIS tables: "+e.message;btn.style.display="";btn.textContent="Try again";btn.onclick=()=>location.reload();return}
   const RK={"Captain":"Capt.","Lieutenant":"Lt."};
-  const roster=ro.map(a=>{const q=new Set();splitL(a.Quals).forEach(x=>QM[x]&&q.add(QM[x]));const c=a.Cert||"";if(c==="CCT")q.add("CCT");if(c==="CCT"||c==="EMT-P"){q.add("ALS");q.add("BLS")}if(c==="EMT")q.add("BLS");
+  const roster=ro.map(a=>{const q=new Set(["FF"]);splitL(a.Quals).forEach(x=>QM[x]&&q.add(QM[x]));const c=a.Cert||"";if(c==="CCT")q.add("CCT");if(c==="CCT"||c==="EMT-P"){q.add("ALS");q.add("BLS")}if(c==="EMT")q.add("BLS");
     return {id:"r"+a.OBJECTID,spId:a.OBJECTID,n:(a.Name||"").replace(/^(Capt\.|Lt\.)\s*/,""),rk:RK[a.Rank]||"",cert:a.FormIn?(c||a.RosterCert):(a.RosterCert||c),q:[...q],formIn:!!a.FormIn,tech:splitL(a.Quals).filter(x=>!QM[x]),cur:a.CurShift?{s:a.CurShift,st:String(a.CurStation||""),u:SEATN[a.CurUnit]?a.CurUnit:null}:null}});
   const pid=Object.fromEntries(roster.map(r=>[String(r.spId),r.id]));
   /* Load seats. Rows for unknown seats, unknown people, a second row for the same seat, or the same person in two seats
@@ -545,6 +545,7 @@ function mapResp(a,pid){if(a.Status==="Ignored")return null;
   ["A","B","C"].forEach(x=>sp.includes(x)||sp.push(x));["1","2","3","4","5","7"].forEach(x=>tp.includes(x)||tp.push(x));
   const r={rid:a.OBJECTID,name:`${last}, ${first}`,em:a.Email||"",rank:a.Rank||"",cert:a.Cert||"",q:splitR(a.Quals).map(normQ),sp,tp,up:a.UnitPref||"",stay:a.StayPref||"",note:a.Notes||"",
     at:a.Submitted?new Date(a.Submitted).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"",status:a.Status,matchedTo:a.MatchedTo||null};
+  if(!r.cert)r.cert=r.q.includes("CCT")?"CCT":r.q.includes("ALS")?"EMT-P":r.q.includes("BLS")?"EMT":"";
   if((a.Status==="Matched"||a.Status==="New person")&&a.MatchedTo)r.pre=pid[String(a.MatchedTo)];
   return r}
 
@@ -583,13 +584,14 @@ const lastOf=n=>{const t=bare(n).split(/\s+/);return lkey(t.length>1?t.slice(1).
 const lm=(n,last)=>{const t=bare(n).split(/\s+/);return lastOf(n)===last||lkey(t[t.length-1])===last};
 const fiOf=n=>{const t=String(n||"").replace(/^(Capt\.|Lt\.)\s*/,"").trim();return /^[A-Za-z][.\s]/.test(t)||t.split(/\s+/).length>1?t[0].toUpperCase():""};
 const RCODE={"Captain":"Capt.","Lieutenant":"Lt."};
-const FQ={"ALS":"ALS","BLS":"BLS","FF":"FF","DPO":"DPO","Cleared Engine Officer":"OFF","Cleared EMS Supervisor":"SUP"};
-const TECH=["Swiftwater","SAR","Rope Ops","Trench Ops","Confined Space Ops","Vehicle Extrication Ops"];
+const FQ={"CCT":"CCT","ALS":"ALS","BLS":"BLS","FF":"FF","DPO":"DPO","Cleared Engine Officer":"OFF","Cleared EMS Supervisor":"SUP"};
+const TECH=["Swiftwater Tech","Surface Water Tech","Swiftwater","SAR","Rope Ops","Trench Ops","Confined Space Ops","Vehicle Extrication Ops"];
 function parseResp(r){const [l,f]=r.name.split(",").map(x=>x.trim());return {last:lkey(l.replace(SUFX,"")),fi:(f||"")[0]?f[0].toUpperCase():"",disp:(f?f+" ":"")+l}}
 function applyResp(p,r){const x=parseResp(r);
   p.n0=p.n0||p.n;p.rk=r.rank in RCODE?RCODE[r.rank]:r.rank?"":p.rk;p.last=x.disp.replace(/^\S+\s/,"")||x.disp;
   p.n=(p.rk?p.rk+" ":"")+x.disp;p.cert=r.cert;
-  const q=new Set();if(r.cert==="CCT"){q.add("ALS");q.add("CCT")}if(r.cert==="EMT-P")q.add("ALS");if(r.cert==="EMT")q.add("BLS");
+  /* FF isn't asked on the form: everyone is treated as FF. */
+  const q=new Set(["FF"]);if(r.cert==="CCT"||r.q.includes("CCT")){q.add("ALS");q.add("CCT")}if(r.cert==="EMT-P")q.add("ALS");if(r.cert==="EMT")q.add("BLS");
   r.q.forEach(k=>FQ[k]&&q.add(FQ[k]));if(q.has("ALS"))q.add("BLS");p.q=[...q];p.tech=r.q.filter(k=>TECH.includes(k));
   p.sp=r.sp;p.tp=r.tp;p.up=r.up;p.note=r.note||"";p.at=r.at;p.em=r.em;p.nr=false;p.rid=r.rid;r.pid=p.id;if(window.LIVE&&LV.onApply)LV.onApply(p,r)}
 function autoMatch(r){const x=parseResp(r);
