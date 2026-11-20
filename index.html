@@ -455,6 +455,10 @@ async function qAll(t){let out=[],off=0;for(;;){const j=await agol(`/${t}/query`
 async function edits(t,{adds,updates,deletes}){const p={};if(adds)p.adds=JSON.stringify(adds.map(a=>({attributes:a})));if(updates)p.updates=JSON.stringify(updates.map(a=>({attributes:a})));if(deletes)p.deletes=deletes.join(",");
   const j=await agol(`/${t}/applyEdits`,p,true);const bad=[...(j.addResults||[]),...(j.updateResults||[]),...(j.deleteResults||[])].find(x=>!x.success);if(bad)throw new Error((bad.error&&bad.error.description)||"Save failed");return j}
 const QM={"ALS":"ALS","BLS":"BLS","FF":"FF","DPO":"DPO","Cleared Engine Officer":"OFF","Cleared EMS Supervisor":"SUP"};
+const QKEYS=["ALS","BLS","FF","DPO","Cleared Engine Officer","Cleared EMS Supervisor","Swiftwater","SAR","Rope Ops","Trench Ops","Confined Space Ops","Vehicle Extrication Ops"];
+const QALIAS={firefighter:"FF",driveroperator:"DPO",driverpumpoperator:"DPO",engineofficer:"Cleared Engine Officer",emssupervisor:"Cleared EMS Supervisor",searchandrescue:"SAR",swiftwaterrescue:"Swiftwater",extrication:"Vehicle Extrication Ops",vehicleextrication:"Vehicle Extrication Ops"};
+const qk=x=>String(x).toLowerCase().replace(/[^a-z0-9]/g,"");
+const normQ=x=>{const k=qk(x);return QKEYS.find(q=>qk(q)===k)||QALIAS[k]||String(x).replace(/_/g," ").trim()};
 const splitL=s=>(s||"").split(/[,;|]/).map(x=>x.trim()).filter(Boolean);
 async function liveBoot(){
   const gate=document.getElementById("gate"),msg=document.getElementById("gmsg"),btn=document.getElementById("gbtn");
@@ -509,9 +513,11 @@ async function liveBoot(){
 function mapResp(a,pid){if(a.Status==="Ignored")return null;
   const cap=s=>(s||"").trim().toLowerCase().replace(/(^|[\s'-])([a-z])/g,(m,x,y)=>x+y.toUpperCase());
   const last=cap(a.LastName),first=cap(a.FirstName);
-  const sp=splitL(a.ShiftRank).filter(x=>/^[ABC]$/.test(x)),tp=splitL(a.StationRank);
+  const sp=[],tp=[];
+  splitL(a.ShiftRank).forEach(x=>{x=x.replace(/_/g," ").trim();const m=x.match(/^([ABC])\b/i)||x.match(/\b([ABC])\s*shift/i)||x.match(/shift\s*([ABC])\b/i);const v=m&&m[1].toUpperCase();if(v&&!sp.includes(v))sp.push(v)});
+  splitL(a.StationRank).forEach(x=>{const m=String(x).match(/\d+/);const v=m&&String(+m[0]);if(v&&!tp.includes(v))tp.push(v)});
   ["A","B","C"].forEach(x=>sp.includes(x)||sp.push(x));["1","2","3","4","5","7"].forEach(x=>tp.includes(x)||tp.push(x));
-  const r={rid:a.OBJECTID,name:`${last}, ${first}`,em:a.Email||"",rank:a.Rank||"",cert:a.Cert||"",q:splitL(a.Quals),sp,tp,up:a.UnitPref||"",stay:a.StayPref||"",note:a.Notes||"",
+  const r={rid:a.OBJECTID,name:`${last}, ${first}`,em:a.Email||"",rank:a.Rank||"",cert:a.Cert||"",q:splitL(a.Quals).map(normQ),sp,tp,up:a.UnitPref||"",stay:a.StayPref||"",note:a.Notes||"",
     at:a.Submitted?new Date(a.Submitted).toLocaleString("en-US",{month:"short",day:"numeric",hour:"numeric",minute:"2-digit"}):"",status:a.Status,matchedTo:a.MatchedTo||null};
   if((a.Status==="Matched"||a.Status==="New person")&&a.MatchedTo)r.pre=pid[String(a.MatchedTo)];
   return r}
@@ -703,7 +709,7 @@ function hungarian(a){const n=a.length,m=a[0].length,INF=1e15,u=new Float64Array
       for(let j=0;j<=m;j++){if(used[j]){u[p[j]]+=delta;v[j]-=delta}else minv[j]-=delta}j0=j1}while(p[j0]!==0);
     do{const j1=way[j0];p[j0]=p[j1];j0=j1}while(j0)}
   const r=new Array(n).fill(-1);for(let j=1;j<=m;j++)if(p[j])r[p[j]-1]=j-1;return r}
-const UT={eng:"Engine",med:"Medic",amb:"Ambulance",sup:"EMS Supervisor"};
+const UT={eng:"Engine",med:"Medic",amb:"Ambulance",sup:"County"};
 function seatCost(p,s,u,lab,req){if(!meets(p,req))return 1e6;
   const sr=p.sp.indexOf(s),tr=p.tp.indexOf(u.s);let c=[0,6,12][sr]??14;c+=tr<0?8:tr*1.5;
   if(p.up&&!p.up.startsWith("No")&&!p.up.startsWith(UT[u.t]))c+=1.5;
